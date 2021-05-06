@@ -1,8 +1,9 @@
-# Search engine with PostgreSQL full-text search functions
+# Search engine with PostgreSQL full-text search functions and PostGIS
 
 ## Documentation
 
 https://www.postgresql.org/docs/9.1/textsearch-indexes.html
+https://postgis.net/docs/
 
 ## Database
 
@@ -16,16 +17,27 @@ In the db folder there is a sql script with the queries required to set the data
 
 4. Update the seed and init scripts with these structural changes using knex raw since Objection does not support these functions and structure
 
+5. Enable PostGIS on database
+
+6. Set geometry on Location table
+
+7. Import UK postcodes with coordinates and set geometry
+
+8. Add trigger on Location insert to set the geometry column
+
+9. Add API for postcodes CRUD
+
 ## Backend
 
-Create search API adding a new POST (the search term is a body parameter). The API performs a query using the to_tsquery function and ts_rank or ts_rank_cd function. The search terms coming from the body parameter must be processed with the plainto_tsquery function
+Create search API adding a new POST (the keywords and postocode are body parameters).
+The API performs a query using the to_tsquery function and ts_rank or ts_rank_cd function. The keywords coming from the body parameter must be processed with the plainto_tsquery function.
+If postcode is provided in the request, the sorting of the results is performed by distance and by ranking
 
 ## Frontend
 
-Cleanup HomeSearch.js from full-text filtering functions
+Cleanup HomeSearch.js from full-text and filtering functions
 When the Search button is clicked, then call the search POST API. Pass the search string in a body parameter and populate the services list with the response data
-Keep at frontend side the Category filter function
 
 ## Next steps
 
-Move the postcode search function to the backend side
+Move to the back end side also search by category
