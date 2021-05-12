@@ -64,7 +64,8 @@ UPDATE "Location" SET geom = ST_SetSRID(ST_MakePoint(long::decimal, lat::decimal
 /* Add UK postcodes with geometry */
 -- Download csv from https://www.doogal.co.uk/
 -- Extract only first 4 columns to another csv
--- in bash cat postcodes.csv | cut -d \, -f1,2,3,4 > subset_postcodes.csv;     
+-- in bash cat postcodes.csv | cut -d \, -f1,2,3,4 > subset_postcodes.csv;   
+-- convert file subset_postcodes.csv into a json object and split json into smaller files
 -- 4. create postcode table
 create table postcode(
         postcode varchar(10) unique primary key,
@@ -74,10 +75,16 @@ create table postcode(
         location geometry
 );
 alter table postcode owner to dos;
--- 5. import csv file using PgAdmin4 tool
-
--- 6. set geometry using SRID to 4326
-UPDATE postcode SET location = ST_SetSRID(ST_MakePoint(longitude, latitude),4326);
+-- 5. create trigger to update geometry on insert and update
+CREATE FUNCTION postcode_geom_trigger() RETURNS trigger AS $$
+begin
+  	new.location := ST_SetSRID(ST_MakePoint(new.longitude::decimal, new.latitude::decimal),4326);
+  	return new;
+end
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER postcodegeom BEFORE INSERT OR UPDATE
+    ON "postcode" FOR EACH ROW EXECUTE PROCEDURE postcode_geom_trigger();
+-- 6. Import postcodes from json files with api
 /*********** End Add postcode geometry 2 ********************/
 
 ----------------------------------------------------------------------------------
