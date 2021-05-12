@@ -2,18 +2,31 @@ const axios = require('axios');
 const parse = require('csv-parse');
 const fs = require('fs');
 const knex = require('./knexController');
-//const postcodesJson = require('../db/postcodes.json');
-//const JSONStream = require('JSONStream');
-
-const FILENAME = `new_aa.csv`;
 
 module.exports = {
-  getRemotePostcode: async (postcode) => {
-    axios.get(`http://api.postcodes.io/postcodes/${postcode}`);
+  // fetch postcode information from external service http://api.postcodes.io
+  getRemotePostcode: (postcode) => {
+    return axios.get(`http://api.postcodes.io/postcodes/${postcode}`);
   },
-  getLocalPostcode: async (knex, postcode) => {
-    knex('postcode').where('postcode', postcode).select('postcode');
+  // select postcode from local db
+  getLocalPostcode: (postcode) => {
+    return knex('postcode').where('postcode', postcode).select('postcode');
   },
+  //add new postcode in db
+  insertPostcode: (postcodeObj) => {
+    return knex('postcode').insert({
+      postcode: postcodeObj.postcode,
+      in_use: 'Yes',
+      latitude: postcodeObj.latitude.toString(),
+      longitude: postcodeObj.longitude.toString(),
+    });
+  },
+  /*
+    seed postcode table with data from json files
+    start and end parameters define the number of 
+    files (from [start].json to [end].json)
+    about 50 files per request
+  */
   seedPostcodes: async (start, end) => {
     for (let i = start; i < end; i++) {
       let postcodesJson = require(`../db/postcodes/${i}.json`);
@@ -23,12 +36,7 @@ module.exports = {
         .catch((error) => {
           console.log(error);
         });
-      /* knex('postcode_temp')
-        .insert(postcodesJson)
-        .then(console.log(`Inserted values for file ${i}.json`))
-        .catch((error) => {
-          console.log(error);
-        }); */
     }
+    return;
   },
 };

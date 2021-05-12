@@ -1,70 +1,64 @@
 const bodyParser = require('body-parser');
-const knex = require('./knexController');
-const axios = require('axios');
 const { searchQuery, searchQueryLocation } = require('./querystring');
-const postcodeController = require('./postcodeController');
+const {
+  getLocalPostcode,
+  getRemotePostcode,
+  seedPostcodes,
+  insertPostcode,
+} = require('./postcodeController');
+const { rawQuery } = require('./queryController');
 
 module.exports = function (app) {
   app.use(bodyParser.json());
 
+  // check api status
   app.get('/api', function (req, res) {
     res.json('this is the api service');
   });
 
+  /* seed postcode table: must be called several times
+  incrementing start and end parameters 
+  (0-50, 50-100, 100-150, 150-200, 200-263)
+  */
   app.post('/api/seedpostcodes', function (req, res) {
     const start = req.body.start;
     const end = req.body.end;
-    postcodeController.seedPostcodes(start, end);
+    seedPostcodes(start, end);
     res.sendStatus(200);
   });
 
+  // search by keywords
   app.post('/api/search', function (req, res) {
     const term = req.body.searchstring;
     const postcode = req.body.postcode;
     const params = { term: term, postcode: postcode };
     const queryStr =
       postcode && postcode !== '' ? searchQueryLocation : searchQuery;
-    knex
-      .select('postcode')
-      .from('postcode')
-      .where('postcode', '=', postcode)
-      .then((rows) => {
+    try {
+      // check if postcode is in db
+      getLocalPostcode(postcode).then((rows) => {
         if (rows.length == 0) {
-          console.log('Postcode not found locally. Call external api');
-          axios
-            .get(`http://api.postcodes.io/postcodes/${postcode}`)
-            .then((response) => {
-              let postcodeObj = response.data.result;
-              console.log('Found postcode');
-              console.log(postcodeObj);
-              knex('postcode')
-                .insert({
-                  postcode: postcodeObj.postcode,
-                  in_use: 'Yes',
-                  latitude: postcodeObj.latitude.toString(),
-                  longitude: postcodeObj.longitude.toString(),
-                })
-                .then((ir) => {
-                  console.log(ir);
-                  console.log('Search query');
-                  knex.raw(queryStr, params).then((result) => {
-                    res.json(result.rows);
-                  });
-                });
-            })
-            .catch(function (error) {
-              res.sendStatus(500);
+          //if postcode is not in db get it from external api
+          getRemotePostcode(postcode).then((response) => {
+            let postcodeObj = response.data.result;
+            // add postcode to db
+            insertPostcode(postcodeObj).then((ir) => {
+              // perform search query
+              rawQuery(queryStr, params).then((result) => {
+                res.json(result.rows);
+              });
             });
+          });
         } else {
-          console.log('Search query');
-          knex.raw(queryStr, params).then((result) => {
+          // perform search query
+          rawQuery(queryStr, params).then((result) => {
             res.json(result.rows);
           });
         }
-      })
-      .catch((err) => {
-        console.log(err);
-        res.sendStatus(500);
       });
+    } catch (err) {
+      //console.log(err);
+      res.sendStatus(500);
+    }
   });
 };
